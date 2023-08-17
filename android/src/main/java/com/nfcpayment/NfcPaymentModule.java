@@ -1,23 +1,28 @@
 package com.nfcpayment;
 
+import android.nfc.tech.IsoDep;
 import android.nfc.NfcAdapter;
+import android.nfc.Tag;
+import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.Log;
 import androidx.annotation.NonNull;
-import android.os.Bundle;
+import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.module.annotations.ReactModule;
-import com.facebook.react.bridge.LifecycleEventListener;
+import java.io.IOException;
+
 
 @ReactModule(name = NfcPaymentModule.NAME)
-public class NfcPaymentModule extends ReactContextBaseJavaModule implements LifecycleEventListener {
+public class NfcPaymentModule extends ReactContextBaseJavaModule implements LifecycleEventListener, NfcAdapter.ReaderCallback {
+  
   public static final String NAME = "NfcPayment";
-
   private final ReactApplicationContext reactContext;
   private NfcAdapter mNfcAdapter;
-  private Boolean isResumed = false;
 
   public NfcPaymentModule(ReactApplicationContext reactContext) {
     super(reactContext);
@@ -37,13 +42,9 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
   public void onHostResume() {
     if (mNfcAdapter != null) {
       Bundle options = new Bundle();
-      // Work around for some broken Nfc firmware implementations that poll the card
-      // too fast
+
       options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250);
 
-      // Enable ReaderMode for all types of card and disable platform sounds
-      // the option NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK is NOT set
-      // to get the data of the tag after reading
       mNfcAdapter.enableReaderMode(reactContext.getCurrentActivity(),
           this,
           NfcAdapter.FLAG_READER_NFC_A |
@@ -58,7 +59,9 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
 
   @Override
   public void onHostPause() {
-    Log.d("NFCACTIONTEST", "onHostPause");
+     if (mNfcAdapter != null){
+        mNfcAdapter.disableReaderMode(reactContext.getCurrentActivity());
+     }
   }
 
   @Override
@@ -66,15 +69,34 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
     Log.d("NFCACTIONTEST", "onHostDestroy");
   }
 
-  // Example method
-  // See https://reactnative.dev/docs/native-modules-android
-  @ReactMethod
-  public void multiply(double a, double b, Promise promise) {
-    promise.resolve(a * b);
-  }
-
+  
   @ReactMethod
   public void test(String a, Promise promise) {
     promise.resolve(a);
+  }
+
+  @Override
+  public void onTagDiscovered(Tag tag) {
+
+    IsoDep isoDep = null;
+
+    try {
+      isoDep = IsoDep.get(tag);
+      if (isoDep != null) {
+        ((Vibrator) reactContext.getCurrentActivity().getSystemService(reactContext.getCurrentActivity().VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(350, 250));
+      }
+
+      isoDep.connect();
+
+      try {
+        isoDep.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 }
