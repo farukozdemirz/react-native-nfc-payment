@@ -17,10 +17,45 @@ const NfcPayment = NativeModules.NfcPayment
       }
     );
 
-export function registerTagEvent(options: object): Promise<String> {
-  return NfcPayment.registerTagEvent(options);
+export interface ICardTransaction {
+  amount: number;
+  currency: string;
+  cyptogramData: string;
+  date: string;
+  time: string;
 }
 
-export function unregisterTagEvent(): Promise<Boolean> {
+export interface ICardApplication {
+  aid: number[];
+  amount: number;
+  applicationLabel: string;
+  leftPinTry: number;
+  listTransactions: ICardTransaction[];
+  priority: number;
+  readingStep: string;
+  transactionCounter: number;
+}
+
+export interface INfcCardInfo {
+  cardNumber: string;
+  cardType: string;
+  expireDate: string;
+  typeAids: string[];
+  applications: ICardApplication[];
+}
+
+export interface INfcModuleConfig {
+  contactLess?: boolean;
+  readAllAids?: boolean;
+  readTransactions?: boolean;
+  removeDefaultParsers?: boolean;
+  readAt?: boolean;
+}
+
+export function registerTagEvent(config: INfcModuleConfig): Promise<string> {
+  return NfcPayment.registerTagEvent(config);
+}
+
+export function unregisterTagEvent(): Promise<boolean> {
   return NfcPayment.unregisterTagEvent();
 }

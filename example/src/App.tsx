@@ -1,19 +1,40 @@
-import * as React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { registerTagEvent, unregisterTagEvent } from 'react-native-nfc-payment';
+import {
+  registerTagEvent,
+  unregisterTagEvent,
+  type INfcModuleConfig,
+  type INfcCardInfo,
+} from 'react-native-nfc-payment';
+import CardInfo from './CardInfo';
 
 export default function App() {
+  const [cardInfos, setCardInfos] = useState<INfcCardInfo | null>(null);
+
+  useEffect(() => {
+    onRegisterTagEvent();
+    return () => {
+      onUnregisterTagEvent();
+    };
+  }, []);
+
   const onRegisterTagEvent = async () => {
     try {
-      var options = {};
+      var options: INfcModuleConfig = {
+        contactLess: true,
+        readAllAids: true,
+        readTransactions: true,
+        removeDefaultParsers: false,
+        readAt: true,
+      };
       const result = await registerTagEvent(options);
-      console.log('registerTagEvent::result', result);
+      setCardInfos(JSON.parse(result));
     } catch (error) {
       console.log('error', error);
     }
   };
 
-  const onPauseNfc = async () => {
+  const onUnregisterTagEvent = async () => {
     try {
       const result = await unregisterTagEvent();
       console.log('unregisterTagEvent::result', result);
@@ -21,14 +42,17 @@ export default function App() {
       console.log('error', error);
     }
   };
-
   return (
     <View style={styles.container}>
+      {cardInfos && <CardInfo cardInfos={cardInfos} />}
       <TouchableOpacity style={styles.buttonStyle} onPress={onRegisterTagEvent}>
-        <Text>registerTagEvent NFC</Text>
+        <Text>Register Tag Event</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.buttonStyle} onPress={onPauseNfc}>
-        <Text>unregisterTagEvent NFC</Text>
+      <TouchableOpacity
+        style={styles.buttonStyle}
+        onPress={onUnregisterTagEvent}
+      >
+        <Text>Unregister Tag Event</Text>
       </TouchableOpacity>
     </View>
   );
@@ -37,14 +61,14 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 30,
   },
-
   buttonStyle: {
-    margin: 20,
     padding: 10,
     backgroundColor: '#ddd',
     borderRadius: 40,
+    alignItems: 'center',
+    marginBottom: 20,
   },
 });
