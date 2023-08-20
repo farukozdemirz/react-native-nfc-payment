@@ -1,6 +1,6 @@
 {
   "name": "react-native-nfc-payment",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "contactless payment with nfc",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
