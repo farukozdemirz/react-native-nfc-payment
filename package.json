@@ -11,9 +11,9 @@
     "src",
     "lib",
     "android",
-    "ios",
-    "cpp",
-    "*.podspec",
+    "!ios",
+    "!cpp",
+    "!*.podspec",
     "!lib/typescript/example",
     "!ios/build",
     "!android/build",
@@ -24,6 +24,8 @@
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
+    "!java_pid74409.hprof",
+    "!**/java_pid74409.hprof",
     "!**/.*"
   ],
   "scripts": {
