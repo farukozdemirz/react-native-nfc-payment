@@ -17,6 +17,10 @@ const NfcPayment = NativeModules.NfcPayment
       }
     );
 
-export function multiply(a: number, b: number): Promise<number> {
-  return NfcPayment.multiply(a, b);
+export function registerTagEvent(options: object): Promise<String> {
+  return NfcPayment.registerTagEvent(options);
+}
+
+export function unregisterTagEvent(): Promise<Boolean> {
+  return NfcPayment.unregisterTagEvent();
 }

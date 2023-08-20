@@ -11,12 +11,12 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
 
-import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.module.annotations.ReactModule;
 
 import com.github.devnied.emvnfccard.enums.EmvCardScheme;
@@ -36,6 +36,9 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
   public static final String NAME = "NfcPayment";
   private final ReactApplicationContext reactContext;
   private NfcAdapter mNfcAdapter;
+  private Promise promise;
+  private Boolean isResume;
+  private Config config = new Config();
 
   public NfcPaymentModule(ReactApplicationContext reactContext) {
     super(reactContext);
@@ -50,13 +53,32 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
     return NAME;
   }
 
-  @ReactMethod
-  private void startNfc(Promise promise) {
-    Log.d("NFCACTIONTEST", "startNfc");
+  private void setConfigFromOptions(ReadableMap options) {
+    if (options.hasKey("contactLess")) {
+      config.setContactLess(options.getBoolean("contactLess"));
+    }
+    if (options.hasKey("readAllAids")) {
+      config.setReadAllAids(options.getBoolean("readAllAids"));
+    }
+    if (options.hasKey("readTransactions")) {
+      config.setReadTransactions(options.getBoolean("readTransactions"));
+    }
+    if (options.hasKey("removeDefaultParsers")) {
+      config.setRemoveDefaultParsers(options.getBoolean("removeDefaultParsers"));
+    }
+    if (options.hasKey("readAt")) {
+      config.setReadAt(options.getBoolean("readAt"));
+    }
+  }
 
+  @ReactMethod
+  private void registerTagEvent(ReadableMap options, Promise promise) {
     if (mNfcAdapter != null){
-      Bundle options = new Bundle();
-      options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250);
+      Bundle bundle = new Bundle();
+      bundle.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250);
+      this.isResume = true;
+      this.promise = promise;
+      setConfigFromOptions(options);
       mNfcAdapter.enableReaderMode(reactContext.getCurrentActivity(),
         this,
         NfcAdapter.FLAG_READER_NFC_A |
@@ -65,12 +87,55 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
           NfcAdapter.FLAG_READER_NFC_V |
           NfcAdapter.FLAG_READER_NFC_BARCODE |
           NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS,
-        options);
+        bundle);
+    }
+  }
+
+  @Override
+  public void onTagDiscovered(Tag tag) {
+    IsoDep isoDep = null;
+    Log.d("NFCPaymentModule", "onTagDiscovered");
+    if(this.isResume){
+      try {
+        isoDep = IsoDep.get(tag);
+        isoDep.connect();
+        NfcPaymentProvider provider = createNfcPaymentProvider(isoDep);
+        EmvTemplate parser = createEmvTemplate(provider);
+        EmvCard card = parser.readEmvCard();
+        CreditCard creditCard = extractCreditCardInfo(card);
+
+        if (isoDep != null) {
+          Vibrator vibrator = (Vibrator) reactContext.getCurrentActivity().getSystemService(reactContext.getCurrentActivity().VIBRATOR_SERVICE);
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (vibrator != null) {
+              vibrator.vibrate(VibrationEffect.createOneShot(350, 250));
+            }
+          } else {
+            if (vibrator != null) {
+              vibrator.vibrate(350);
+            }
+          }
+        }
+
+        this.promise.resolve(creditCard.toString());
+        this.isResume = false;
+
+        try {
+          isoDep.close();
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      } catch (IOException e) {
+        e.printStackTrace();
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
     }
   }
 
   @Override
   public void onHostPause() {
+    Log.d("NFCPaymentModule", "onHostPause");
      if (mNfcAdapter != null){
         mNfcAdapter.disableReaderMode(reactContext.getCurrentActivity());
      }
@@ -78,6 +143,7 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
 
   @Override
   public void onHostDestroy() {
+    Log.d("NFCPaymentModule", "onHostDestroy");
     if (mNfcAdapter != null){
       mNfcAdapter.disableReaderMode(reactContext.getCurrentActivity());
     }
@@ -90,47 +156,13 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
   @ReactMethod
   private void unregisterTagEvent(Promise promise) {
     if (mNfcAdapter != null){
-      Log.d("NFCACTIONTEST", "unregisterTagEvent");
+      Log.d("NFCPaymentModule", "unregisterTagEvent");
       mNfcAdapter.disableReaderMode(this.reactContext.getCurrentActivity());
     }
     promise.resolve(true);
   }
 
-  @Override
-  public void onTagDiscovered(Tag tag) {
-    IsoDep isoDep = null;
-    Log.d("NFCACTIONTEST", "onTagDiscovered");
-
-    try {
-      isoDep = IsoDep.get(tag);
-      if (isoDep != null) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          ((Vibrator) reactContext.getCurrentActivity().getSystemService(reactContext.getCurrentActivity().VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(350, 250));
-        }
-      }
-
-      isoDep.connect();
-      NfcPaymentProvider provider = createNfcPaymentProvider(isoDep);
-      EmvTemplate parser = createEmvTemplate(provider);
-      EmvCard card = parser.readEmvCard();
-      CreditCard creditCard = extractCreditCardInfo(card);
-
-      Log.d("NFCACTIONTEST", creditCard.toString());
-
-      try {
-        isoDep.close();
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-  }
-
   private LocalDate extractExpireDate(Date expireDate) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       if (expireDate != null) {
         return expireDate.toInstant()
           .atZone(ZoneId.systemDefault())
@@ -138,16 +170,12 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
       } else {
         return LocalDate.of(1999, 12, 31);
       }
-    }
-    return null;
   }
 
   private CreditCard extractCreditCardInfo(EmvCard card) {
     String cardNumber = card.getCardNumber();
     LocalDate expireDate = extractExpireDate(card.getExpireDate());
-
     EmvCardScheme cardGetType = card.getType();
-
     CreditCard creditCard = new CreditCard();
     creditCard.setCardNumber(prettyPrintCardNumber(cardNumber));
     creditCard.setExpireDate(expireDate.toString());
@@ -166,16 +194,16 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
   }
 
   private EmvTemplate createEmvTemplate(NfcPaymentProvider provider) {
-    EmvTemplate.Config config = EmvTemplate.Config()
-      .setContactLess(true)
-      .setReadAllAids(true)
-      .setReadTransactions(true)
-      .setRemoveDefaultParsers(false)
-      .setReadAt(true);
+    EmvTemplate.Config emvConfig = EmvTemplate.Config()
+      .setContactLess(config.isContactLess())
+      .setReadAllAids(config.isReadAllAids())
+      .setReadTransactions(config.isReadTransactions())
+      .setRemoveDefaultParsers(config.isRemoveDefaultParsers())
+      .setReadAt(config.isReadAt());
 
     return EmvTemplate.Builder()
       .setProvider(provider)
-      .setConfig(config)
+      .setConfig(emvConfig)
       .build();
   }
 
