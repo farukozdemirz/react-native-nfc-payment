@@ -2,7 +2,17 @@ import { StyleSheet, Text, View } from 'react-native';
 import React from 'react';
 import type { INfcCardInfo } from 'react-native-nfc-payment';
 
-const CardInfo = ({ cardInfos }: { cardInfos: INfcCardInfo }) => {
+const CardInfo = ({
+  cardInfos,
+  index,
+}: {
+  cardInfos: INfcCardInfo;
+  index: number;
+}) => {
+  const cardApplication = cardInfos?.applications
+    ? cardInfos.applications[index]
+    : null;
+
   return (
     <View style={styles.cardInfos}>
       <Text style={styles.textStyle}>Card Number: {cardInfos.cardNumber}</Text>
@@ -11,15 +21,9 @@ const CardInfo = ({ cardInfos }: { cardInfos: INfcCardInfo }) => {
         Card Expire Date: {cardInfos.expireDate}
       </Text>
       <View style={styles.row}>
-        <Text style={styles.textStyle}>Type Aids:{` [ `}</Text>
-        {cardInfos.typeAids?.length > 0 &&
-          cardInfos.typeAids.map((aid, index) => (
-            <Text key={index} style={styles.textStyle}>
-              {aid}
-              {index < cardInfos.typeAids.length - 1 && ', '}
-            </Text>
-          ))}
-        <Text style={styles.textStyle}>{` ]`}</Text>
+        <Text style={styles.textStyle}>
+          Application Label: {cardApplication?.applicationLabel}
+        </Text>
       </View>
     </View>
   );

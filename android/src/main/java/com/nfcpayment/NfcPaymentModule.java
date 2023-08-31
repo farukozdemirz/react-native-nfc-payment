@@ -27,6 +27,7 @@ import com.github.devnied.emvnfccard.parser.EmvTemplate;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -39,6 +40,8 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
   private Promise promise;
   private Boolean isResume;
   private Config config = new Config();
+
+  private Boolean isComboCard = false;
 
   public NfcPaymentModule(ReactApplicationContext reactContext) {
     super(reactContext);
@@ -91,6 +94,44 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
     }
   }
 
+  public void responseCallback(String responseObject, IsoDep isoDep ) {
+
+    if (isoDep != null) {
+      Vibrator vibrator = (Vibrator) reactContext.getCurrentActivity().getSystemService(reactContext.getCurrentActivity().VIBRATOR_SERVICE);
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (vibrator != null) {
+          vibrator.vibrate(VibrationEffect.createOneShot(350, 250));
+        }
+      } else {
+        if (vibrator != null) {
+          vibrator.vibrate(350);
+        }
+      }
+    }
+
+    this.promise.resolve(responseObject);
+    this.isResume = false;
+
+    try {
+      isoDep.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private CreditCard processNfc(IsoDep isoDep) {
+    try{
+      NfcPaymentProvider provider = createNfcPaymentProvider(isoDep);
+      EmvTemplate parser = createEmvTemplate(provider);
+      EmvCard card = parser.readEmvCard();
+      CreditCard creditCard = extractCreditCardInfo(card);
+      return creditCard;
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return null;
+  }
+
   @Override
   public void onTagDiscovered(Tag tag) {
     IsoDep isoDep = null;
@@ -99,32 +140,18 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
       try {
         isoDep = IsoDep.get(tag);
         isoDep.connect();
-        NfcPaymentProvider provider = createNfcPaymentProvider(isoDep);
-        EmvTemplate parser = createEmvTemplate(provider);
-        EmvCard card = parser.readEmvCard();
-        CreditCard creditCard = extractCreditCardInfo(card);
+        CreditCard creditCard = this.processNfc(isoDep);
+        List<CreditCard> creditCardList = new ArrayList<>();
 
-        if (isoDep != null) {
-          Vibrator vibrator = (Vibrator) reactContext.getCurrentActivity().getSystemService(reactContext.getCurrentActivity().VIBRATOR_SERVICE);
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (vibrator != null) {
-              vibrator.vibrate(VibrationEffect.createOneShot(350, 250));
-            }
-          } else {
-            if (vibrator != null) {
-              vibrator.vibrate(350);
-            }
-          }
+        if(this.isComboCard){
+          CreditCard secondCard = this.processNfc(isoDep);
+          creditCardList.add(secondCard);
+          this.isComboCard = false;
         }
 
-        this.promise.resolve(creditCard.toString());
-        this.isResume = false;
-
-        try {
-          isoDep.close();
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
+        creditCardList.add(creditCard);
+        String responseObject = creditCardList.toString();
+        responseCallback(responseObject, isoDep);
       } catch (IOException e) {
         e.printStackTrace();
       } catch (Exception e) {
@@ -188,6 +215,7 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
     }
 
     List<Application> applications = card.getApplications();
+    this.isComboCard = applications.size() == 2;
     creditCard.setApplications(applications);
 
     return creditCard;
@@ -196,7 +224,7 @@ public class NfcPaymentModule extends ReactContextBaseJavaModule implements Life
   private EmvTemplate createEmvTemplate(NfcPaymentProvider provider) {
     EmvTemplate.Config emvConfig = EmvTemplate.Config()
       .setContactLess(config.isContactLess())
-      .setReadAllAids(config.isReadAllAids())
+      .setReadAllAids(!this.isComboCard)
       .setReadTransactions(config.isReadTransactions())
       .setRemoveDefaultParsers(config.isRemoveDefaultParsers())
       .setReadAt(config.isReadAt());

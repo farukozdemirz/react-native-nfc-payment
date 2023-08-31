@@ -9,7 +9,7 @@ import {
 import CardInfo from './CardInfo';
 
 export default function App() {
-  const [cardInfos, setCardInfos] = useState<INfcCardInfo | null>(null);
+  const [cardInfos, setCardInfos] = useState<INfcCardInfo[] | null>(null);
 
   useEffect(() => {
     onRegisterTagEvent();
@@ -44,7 +44,10 @@ export default function App() {
   };
   return (
     <View style={styles.container}>
-      {cardInfos && <CardInfo cardInfos={cardInfos} />}
+      {cardInfos &&
+        cardInfos.map((card, index) => (
+          <CardInfo key={index} index={index} cardInfos={card} />
+        ))}
       <TouchableOpacity style={styles.buttonStyle} onPress={onRegisterTagEvent}>
         <Text>Register Tag Event</Text>
       </TouchableOpacity>
