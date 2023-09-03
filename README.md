@@ -39,6 +39,8 @@ Simple add `uses-permission` into your `AndroidManifest.xml`:
 ## Usage / Example
 
 ```javascript
+import { useEffect, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
   registerTagEvent,
   unregisterTagEvent,
@@ -47,7 +49,7 @@ import {
 } from "react-native-nfc-payment";
 
 export default function App() {
-  const [cardInfos, setCardInfos] = (useState < INfcCardInfo) | (null > null);
+  const [cardInfos, setCardInfos] = useState<INfcCardInfo | null>(null);
 
   useEffect(() => {
     onRegisterTagEvent();
@@ -86,10 +88,7 @@ export default function App() {
       <TouchableOpacity style={styles.buttonStyle} onPress={onRegisterTagEvent}>
         <Text>Register Tag Event</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.buttonStyle}
-        onPress={onUnregisterTagEvent}
-      >
+      <TouchableOpacity style={styles.buttonStyle} onPress={onUnregisterTagEvent}>
         <Text>Unregister Tag Event</Text>
       </TouchableOpacity>
     </View>
@@ -110,6 +109,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 });
+
 ```
 
 ## Contributing
